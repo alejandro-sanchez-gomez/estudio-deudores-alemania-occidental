@@ -1,0 +1,1129 @@
+---
+title: 'Minería de datos: PEC3 - Clasificación con árboles de decisión'
+author: "Autor: Nombre estudiante"
+date: "Diciembre 2023"
+output:
+  html_document:
+    highlight: default
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    includes:
+      in_header: 75.584-PEC-header-5.html
+  pdf_document:
+    highlight: zenburn
+    toc: yes
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval=T, echo=T)
+```
+
+Enunciado del ejercicio
+
+Para el conjunto de datos German Credit, los alumnos deben completar aquí la solución a la PEC3 que consiste de los siguientes apartados. Notad que se detalla el contenido necesario para cada apartado en la Sección 4 (Rúbrica).
+
+El formato de entrega es como en las anteriores PECs: **usernameestudiant-PECn.html** (o PDF/Word) y el código **Rmd**.
+
+Se debe entregar la PEC en el buzón de entregas del aula, como en las anteriores PECs.
+
+# EJERCICIO 1
+
+Realizar un primer análisis descriptivo y de correlaciones. Es importante en este apartado entender bien los datos antes de seguir con los análisis posteriores. Lista todo lo que te haya sorprendido de los datos
+
+## PRESENTACIÓN DEL CASO
+
+### FUENTE DE LOS DATOS
+
+<https://www.kaggle.com/shravan3273/credit-approval>
+
+### DESCRIPCIÓN DE LOS DATOS
+
+El conjunto de datos a estudiar nos muestra los criterios que las diferentes entidades financieras alemanas aplican a la hora de conceder o no un crédito a aquellos que lo deseen.
+
+### OBJETIVO ANALÍTICO
+
+El objetivo analítico será averiguar mediante un estudio preeliminar cuales son los factores que más influyen a la hora de recibir un crédito.
+
+### METODOLOGÍA
+
+El enfoque de trabajo estará basado en los procesos CRISPDM. Por otro lado, la técnica de análisis a emplear será el estudio de correlaciones PCA y la observación holística de los datos.
+
+### LIBRERÍAS
+
+Las librearías a emplear son las siguientes:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+if (!require("dplyr")) install.packages("dplyr"); 
+library('dplyr')
+
+if (!require('ggplot2')) install.packages('ggplot2'); 
+library('ggplot2')
+
+if (!require("tidyr")) install.packages("tidyr"); 
+library('tidyr')
+
+if (!require('factoextra')) install.packages('factoextra'); 
+library('factoextra')
+
+if (!require('corrplot')) install.packages('corrplot'); 
+library('corrplot')
+
+if (!require('correlation')) install.packages('correlation'); 
+library(correlation)
+
+```
+
+## GESTIÓN Y PROCESAMIENTO DE LOS DATOS Y CARACTERÍSTICAS
+
+### EL CONJUNTO DE DATOS
+
+#### CARGA DE DATOS
+
+El primer paso para realizar el análisis exploratorio será cargar y unificar los diferentes archivos en uno sólo:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- read.csv("./data/credit-2.csv", header = TRUE)
+
+```
+
+#### ESTRUCTURA GENERAL
+
+Verificamos la estructura del juego de datos a partir del número de columnas que tenemos y de los ejemplos de los contenidos de las filas:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+str(conjunto_datos)
+
+```
+
+El conjunto de datos contiene **21** variables y **1000** registros.
+
+#### DICCIONARIO DE VARIABLES
+
+Revisaremos la descripción de las variables y sus tipos, luego, las organizaremos lógicamente para darles sentido con el objetivo de construir un diccionario de variables:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+str(conjunto_datos)
+
+```
+
+##### VARIABLES RELACIONADAS CON EL PRESTAMO
+
+
+**purpose (chr)** - Finalidad del préstamo\
+**amount (int)** - Cantidad del préstamo, en Marco Alemán\
+**months_loan_duration (int)** - Duración del préstamo, en meses
+
+##### VARIABLES RELACIONADAS CON EL PRESTATARIO
+
+**checking_balance (chr)** - Cantidad de dinero en la cuenta del prestatario, en Marco Alemán\
+**credit_history (chr)** - Registro del reembolso responsable de las deudas por parte de un prestatario.\
+**savings_balance (chr)** - Ahorros del prestatario, en Marco Alemán\
+**employment_length (chr)** - Tiempo que lleva empleado el prestatario, en años\
+**installment_rate (int)** - Cantidad de dinero pagada por unidad de tiempo, en Marco Alemán al mes (?)\
+**personal_status (chr)** - Género y estado matrimonial del prestatario\
+**other_debtors (chr)** - Descripción de otros prestatario que forman parte del mismo préstamo, si los hay\
+**residence_history (int)** - Tiempo de residencia del prestatario, expresado en años\
+**property (chr)** - Propiedad del prestatario\
+**age (int)** - Edad del prestatario\
+**installment_plan (chr)** - Descripción del plan de pago a plazos del prestatario\
+**housing (chr)** - Vivienda del prestatario\
+**existing_credits (int)** - Número de créditos que debe el prestatario\
+**default (int)** - Veces que el prestatario no ha realizado el pagamiento de la deuda\
+**dependents (int)** - Número de personas que dependen del prestatario\
+**telephone (chr)** - Si el prestatario tiene o no teléfono\
+**foreign_worker (chr)** - Si el prestatario es trabajador extranjero\
+**job (chr)** - Tipo de empleo del prestatario\
+
+#### DISTRIBUCIÓN GENERAL DE LOS DATOS
+
+##### HISTOGRAMAS
+
+Una vez sabemos que datos hacen referencia cada variable, se comprobará el estado de los registros del conjunto de datos para estudiar como proceder con el tratamiento. Para ello, se visualizarán los datos mediante histogramas.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+histList<- list()
+
+for(y in 1:ncol(conjunto_datos)){
+  
+  col <- names(conjunto_datos)[y]
+  ggp <- ggplot(conjunto_datos[y], aes_string(x = col)) + 
+         geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        ylab("distribution")
+  
+  histList[[y]] <- ggp
+}
+
+```
+
+Los histogramas obtenidos son los siguientes:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+histList[1:ncol(conjunto_datos)]
+
+```
+
+Se observa que la mayoría de variables son de tipo categórico y los datos almacenados son trabajables.
+
+##### OBSERVACIONES
+
+###### OBSERVACIONES GLOBALES
+
+Se observa que hay variables categóricas y contiguas. Deberemos transformarlas todas en categóricas más adelante para poder aplicar correctamente modelos.
+
+Además, diversas variables presentan datos difíciles de analizar debido a la falta de información adicional.
+
+###### OBSERVACIONES ESPECÍFICAS
+
+**checking_balance**
+
+Aproximadamente el 40% de los datos son desconocidos. Se procederá ignorando esta observación.
+
+Además, categorías desordenadas que podrían perturbar un futuro análisis, especificamente la categoría "> 200 DM".
+
+**savings_balance**
+
+Presenta categorías desordenadas que podrían perturbar un futuro análisis, especificamente la categoría "> 1000 DM".
+
+**employment_length**
+
+Presenta categorías desordenadas que podrían perturbar un futuro análisis, especificamente las categorías ">7 years" y "unemployed".
+
+**credit_history** 
+
+Presenta datos que podrían ser mejor explicados a partir de la derivación de una nueva variable: **credit_repaired**, compuesta por las categorías "yes" y "no".
+
+**purpose** 
+
+Presenta datos que podrían ser mejor explicados a partir de la derivación de una nueva variable: **purpose_category**, compuesta por las categorías "investment", "amenities" y "car", conservando "others".
+
+**installment_rate**
+
+Presenta datos que no son posibles analizar, pues carecen de contexto o unidad métrica.
+
+Especificamente, no sabemos si se trata de categorías o valores nominales y, en caso de ser categorías, a que hacen referencia.
+
+**installment_plan**
+
+Presenta datos que podrían ser mejor explicados a partir de la derivación de una nueva variable: **has_installment_plan**, compuesta por las categorías "yes" y "no".
+
+**personal_status** 
+
+Presenta datos incompletos, pues no sabemos el estado matrimonial de las mujeres.
+
+Debido a esto, presenta datos que podrían ser mejor explicados a partir de la derivación de una nueva variable:**gender**, compuesta por las categorías "male" y "female"
+
+**other_debtors** 
+
+Presenta datos que podrían ser mejor explicados a partir de la derivación de una nueva variable: **has_other_debtors**, compuesta por las categorías "yes" y "no".
+
+**residence_history** 
+
+Presenta datos que no son posibles analizar, pues carecen de contexto o unidad métrica.
+
+Especificamente, no sabemos si se trata de categorías o valores nominales y, en caso de ser categorías, a que hacen referencia
+
+**default** 
+
+Presenta datos que no son posibles analizar, pues carecen de contexto o unidad métrica. 
+
+Específicamente, no es posible saber si la variables es binaria o numérica. En el caso de que fuera binaria, no se sabe que valor corresponde afirmativamente o negativamente.
+
+**dependents**
+
+Presenta datos que no son posibles analizar, pues carecen de contexto o unidad métrica. 
+
+Específicamente, no es posible saber si la variables es binaria o numérica. En el caso de que fuera binaria, no se sabe que valor corresponde afirmativamente o negativamente.
+
+**job**
+
+Presenta datos que no son posibles analizar correctamente, pues carecen de precisión y contexto común. 
+
+Específicamente, se listan como categorias "unskilled resident" y "skilled employee", las cuales no nos proporcionan la suficiente información (es "skilled employee" residente o no?, el "unskilled resident" trabaja actualmente o no?, etc...)
+
+### TRATAMIENTO DEL CONJUNTO DE DATOS
+
+Una vez hemos observado la distribución de los datos, podemos saber como tratar los datos para poder aplicar en el futuro modelos de clasificación.
+
+#### MODIFICACIÓN DE DATOS
+
+##### LIMPIEZA DE DATOS
+
+Se eliminarán aquellos registros que impiden un correcto estudio de los datos.
+
+###### DATOS VACÍOS
+
+Se comprobará si el conjunto de datos presenta valores vacíos:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+colSums(conjunto_datos=="")
+
+```
+
+El conjunto no presenta datos vacíos, por lo que no se eliminarán registros.
+
+###### DATOS NULOS
+
+Se comprobará si el conjunto de datos presenta valores nulos:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+colSums(is.na(conjunto_datos))
+
+```
+
+El conjunto no presenta datos nulos, por lo que no se eliminarán registros.
+
+###### DATOS REPETIDOS
+
+Se comprobará si el conjunto de datos presenta valores repetidos:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+count(distinct(conjunto_datos))
+
+```
+
+El conjunto no presenta datos repetidos, por lo que no se eliminarán registros.
+
+##### TRANSFORMACIÓN DE LOS DATOS
+
+Una vez hemos eliminado aquellos registros que pueden potencialmente interferir con nuestro modelo, pasaremos a transformar aquellas variables y registros en un formato estudiable. Para ello, todos los datos serán discretizados y, aquellos que ya lo están, serán expresados en dígitos.
+
+Antes de realizar la tarea, se realizará una copia de los datos originales y se trabajará a partir de ésta:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos_original <- conjunto_datos
+
+```
+
+###### DISCRETIZACIÓN DE LAS VARIABLES CONTÍNUAS
+
+El primer paso será determinar cuales son aquellas variables contínuas que debemos discretizar:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+numList <- list()
+x <- 1
+
+for(y in 2:ncol(conjunto_datos)){
+  
+  if(is.numeric(conjunto_datos[, y])){
+    numList[[x]] <- names(conjunto_datos)[y]
+    x <- x+1
+  }
+  
+}
+
+for(y in numList){
+  print(y)
+}
+
+```
+
+Una vez obtenidas, pasaremos a realizar categorías para cada una de ellas en función de la distribución de datos que presentan.
+
+Histogramas:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+for(y in numList){
+  #summary
+  print(summary(conjunto_datos[y]))
+  #plot
+  ggp <- ggplot(conjunto_datos[y], aes_string(x = y)) + 
+         geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        ylab("distribution")
+  print(ggp)
+}
+
+```
+
+**months_loan_duration**
+
+-Categorías a crear
+
+La categorías se basarán en los cuartiles y son las siguientes:
+
+1 = Menos de 12\
+2 = Entre 12 y 18\
+3 = Entre 18 y 24\
+4 = Más de 24\
+
+-Código
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- mutate(conjunto_datos, months_loan_duration =
+                          ifelse(months_loan_duration<12, 1, 
+                                 ifelse(months_loan_duration<18, 2, 
+                                        ifelse(months_loan_duration<24, 3, 4)
+                                        )
+                                )
+)
+
+```
+
+-Resultado
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+ggp <- ggplot(conjunto_datos["months_loan_duration"], aes_string(x = "months_loan_duration")) + 
+      geom_bar(aes(y = (..count..)/sum(..count..))) + ylab("distribution")
+ggp
+
+```
+
+**amount**
+
+-Categorías a crear
+
+La categorías se basarán en los cuartiles y son las siguientes:
+
+1 = Menos de 1366 2 = Entre 1366 y 2320 3 = Entre 2320 y 3972 4 = Más de 3972\
+
+-Código
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- mutate(conjunto_datos, amount =
+                          ifelse(amount<1366, 1, 2
+                                )
+)
+
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+#conjunto_datos <- mutate(conjunto_datos, amount =
+#                          ifelse(amount<1366, 1, 
+#                                 ifelse(amount<2320, 2, 
+#                                        ifelse(amount<3972, 3, 4)
+#                                        )
+#                                )
+#)
+
+```
+
+-Resultado
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+ggp <- ggplot(conjunto_datos["amount"], aes_string(x = "amount")) + 
+      geom_bar(aes(y = (..count..)/sum(..count..))) + ylab("distribution")
+ggp
+
+```
+
+**age**
+
+-Categorías a crear
+
+La categorías se basarán en los cuartiles y son las siguientes:
+
+1 = Menos de 27 2 = Entre 27 y 33 3 = Entre 33 y 42 4 = Más de 42\
+
+-Código
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- mutate(conjunto_datos, age =
+                          ifelse(age<27, 1, 
+                                 ifelse(age<33, 2, 
+                                        ifelse(age<42, 3, 4)
+                                        )
+                                )
+)
+
+```
+
+-Resultado
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+ggp <- ggplot(conjunto_datos["age"], aes_string(x = "age")) + 
+      geom_bar(aes(y = (..count..)/sum(..count..))) + ylab("distribution")
+ggp
+
+```
+
+**installment_rate**, **residence_history**, **existing_credits**, **default**, **dependents**
+
+Las variables mencionadas, a pesar de ser numéricas, son categóricas y no serán transformadas.
+
+###### CONVERSIÓN DE LAS CATEGORÍAS EXPRESADAS EN TEXTO A DÍGITO
+
+Variables categóricas que expresaremos en dígitos mediante factorización:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+if (!require("dplyr")) install.packages("dplyr"); 
+library('dplyr')
+
+categoriesList <- list()
+x <- 1
+
+for(y in 1:ncol(conjunto_datos)){
+  if(is.character(conjunto_datos[, y])){
+    
+    categoriesList[[x]] <- names(conjunto_datos)[y]
+    conjunto_datos[, y] <- as.numeric(factor(conjunto_datos[, y]))
+    
+    x <- x+1
+    
+  }
+}
+
+for(y in categoriesList){
+  print(y)
+}
+
+```
+
+Realizamos la conversión u observamos los resultados:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+for(y in categoriesList){
+  ggp <- ggplot(conjunto_datos[y], aes_string(x = y)) + 
+         geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        ylab("distribution")
+  print(ggp)
+}
+
+```
+
+###### ORDENANDO CATEGORÍAS
+
+**checking_balance**
+
+Además, categorías desordenadas que podrían perturbar un futuro análisis, especificamente la categoría "> 200 DM".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- mutate(conjunto_datos, checking_balance =
+                          ifelse(checking_balance==2, 5,
+                                 ifelse(checking_balance==3, 2, checking_balance
+                                )
+                                )
+);
+```
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+conjunto_datos <- mutate(conjunto_datos, checking_balance =
+                          ifelse(checking_balance==5, 3, checking_balance
+                                )
+);
+
+```
+
+**savings_balance**
+
+Presenta categorías desordenadas que podrían perturbar un futuro análisis, especificamente la categoría "> 1000 DM".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- mutate(conjunto_datos, savings_balance =
+                          ifelse(savings_balance==2, 6,
+                                 ifelse(savings_balance==3, 2, 
+                                        ifelse(savings_balance==4, 3, savings_balance
+                                )
+                                )
+                                )
+);
+```
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+conjunto_datos <- mutate(conjunto_datos, savings_balance =
+                          ifelse(savings_balance==6, 4, savings_balance
+                                )
+)
+
+```
+
+**employment_length**
+
+Presenta categorías desordenadas que podrían perturbar un futuro análisis, especificamente las categorías ">7 years" y "unemployed".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- mutate(conjunto_datos, employment_length =
+                          ifelse(employment_length==1, 6,
+                                 ifelse(employment_length==5, 1, employment_length
+                                )
+                                )
+);
+```
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+conjunto_datos <- mutate(conjunto_datos, employment_length =
+                          ifelse(employment_length==6, 5, employment_length
+                                )
+)
+
+```
+
+#### MODIFICACIÓN DE VARIABLES
+
+##### VARIABLES DERIVABLES
+
+**credit_repaired**, compuesta por las categorías "yes" y "no".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos %>% mutate(
+  credit_repaired=if_else(.$credit_history < 3, 2, 1), 
+  .before=credit_history)
+
+```
+
+**purpose_category**, compuesta por las categorías "investment", "car" y "amenities" , conservando "others".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% mutate(
+  purpose_category=if_else(.$purpose == 1 | .$purpose == 5 | .$purpose ==  10, 1, 
+                 if_else(.$purpose == 2 | .$purpose == 3, 2, 
+                         if_else(.$purpose == 4 | .$purpose == 6 | .$purpose == 8, 3,
+                                 if_else(.$purpose == 7, 4, 4
+                 )
+                 )
+                 )
+                 ), 
+  .after=purpose
+  )
+
+```
+
+**gender**, compuesta por las categorías "male" y "female"
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% mutate(
+  gender=if_else(.$personal_status != 2, 2, 1), 
+  .before=personal_status)
+
+```
+
+**has_other_debtors**, compuesta por las categorías "yes" y "no".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% mutate(
+  has_other_debtors=if_else(.$other_debtors < 3, 1, 2), 
+  .before=other_debtors)
+
+```
+
+**has_installment_plan**, compuesta por las categorías "yes" y "no".
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% mutate(
+  has_installment_plan=if_else(.$installment_plan != 2, 1, 2), 
+  .before=installment_plan)
+
+```
+
+##### VARIABLES DESCARTABLES
+
+- Aquellas que han sido derivadas
+
+**credit_history**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-credit_history)
+
+```
+
+**purpose**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-purpose)
+
+```
+
+**personal_status**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-personal_status)
+
+```
+
+**other_debtors**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-other_debtors)
+
+```
+
+**installment_plan**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-installment_plan)
+
+```
+
+- Aquellas que presentan datos difíciles de analizar
+
+**installment_rate**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-installment_rate)
+
+```
+
+**residence_history** 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-residence_history)
+
+```
+
+**default** 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-default)
+
+```
+
+**dependents**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-dependents)
+
+```
+
+**job**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+conjunto_datos <- conjunto_datos %>% select(-job)
+
+```
+
+## ANÁLISIS EXPLORATORIO
+
+Una vez hemos realizado todo lo necesario para poder estudiar el conjunto de datos, podemos comenzar el análisis exploratorio mediante la técnica de correlaciones PCA.
+
+### NORMALIZACIÓN DE LOS DATOS
+
+Normalizamos los datos para poder aplicar algoritmos que reducen las dimensiones:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+conjunto_datos_nor <- conjunto_datos
+
+for(y in 1:ncol(conjunto_datos)){
+  conjunto_datos_nor[y] <- (conjunto_datos[y] - min(conjunto_datos[y]))/(max(conjunto_datos[y])-min(conjunto_datos[y]))
+}
+
+```
+
+...
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+for(y in 1:ncol(conjunto_datos_nor)){
+  
+  ggp <- ggplot(conjunto_datos_nor[y], aes_string(x = names(conjunto_datos_nor[y]))) + 
+         geom_bar(aes(y = (..count..)/sum(..count..))) + ylab("distribution")
+  print(ggp)
+  
+}
+
+```
+
+### PCA
+
+Tanto el análisis de componentes principales, principal componente analysis (PCA) en inglés, como la descomposición de valores singulares, singular value decomposition (SVD) en inglés, son técnicas que nos permitan trabajar con nuevas características llamadas componentes, que ciertamente son independientes entre sí.
+
+En realidad, estas dos técnicas nos permiten representar el juego de datos en un nuevo sistema de coordenadas que denominamos componentes principales. Este sistema está mejor adaptado a la distribución del juego de datos, de forma que recoge mejor su variabilidad.
+
+#### CRITERIO DE KAISER
+
+Los valores propios se pueden utilizar para determinar el número de componentes principales a retener después de la PCA (Kaiser 1961):
+
+-   Un valor propio \> 1 indica que los PCs representan más varianza de la que representa una de las variables originales de los datos estandarizados. Esto se utiliza habitualmente como punto de corte para el cual se conservan los PCs. Esto solo es cierto cuando los datos están estandarizados.
+
+-   También podemos limitar el número de componentes a este número que representa una determinada fracción de la varianza total. Por ejemplo, si estamos satisfecho con el 80% de la varianza total explicada, usamos el número de componentes para conseguirlo.
+
+#### SELECCIÓN DE DIMENSIONES
+
+Escalamos los datos para una correcta selección de dimensiones:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+# Escalamos los datos
+acc_scale <- scale(conjunto_datos_nor)
+
+# Calculamos las componentes principales
+pca.acc_scale <- prcomp(acc_scale)
+
+# Mostramos la varianza de dichas variables:
+var_acc_scale <- pca.acc_scale$sdev^2
+head(var_acc_scale)
+
+```
+
+Mostramos el histograma de porcentaje de varianza explicado con los datos escalados
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+fviz_eig(pca.acc_scale)
+
+```
+
+Seleccionamos las variables a estudiar a partir del criterio de Káiser:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+ev = get_eig(pca.acc_scale)
+ev
+
+```
+
+Observamos que las 6 primeras dimensionas tienen un valor superiores a 1. Por lo tanto, éstas serán las seleccionadas.
+
+```{r}
+var <- get_pca_var(pca.acc_scale)
+var
+```
+
+#### CONTRIBUCIÓN DE LAS VARIABLES
+
+Las variables más importantes (que más contribuyen en cada dimensión) se pueden resaltar de las siguientes maneras:
+
+-Tabla
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+head(var$contrib[,1:6], ncol(conjunto_datos_nor))
+
+```
+
+-Gráfica
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+corrplot(var$contrib[,1:6], is.cor=FALSE)
+
+```
+
+...
+
+## CONCLUSIONES
+
+...
+
+# EJERCICIO 2
+
+2.  Realizar un primer árbol de decisión. Puedes decidir utilizar todas las variables o, de forma justificada, quitar alguna para el ajuste del modelo
+
+## LIBRERIAS
+
+```{r}
+if(!require(grid)){
+    install.packages('grid', repos='http://cran.us.r-project.org')
+    library(grid)
+}
+
+if(!require(C50)){
+    install.packages('C50', repos='http://cran.us.r-project.org')
+    library(C50)
+}
+
+```
+
+## PREPARACIÓN DE LOS DATOS
+
+Para la futura evaluación del árbol de decisión, es necesario dividir el conjunto de datos en un conjunto de entrenamiento y un conjunto de prueba.
+
+El conjunto de entrenamiento es el subconjunto del conjunto original de datos utilizado para construir un primer modelo; y el conjunto de prueba, el subconjunto del conjunto original de datos utilizado para evaluar la calidad del modelo.
+
+Lo más correcto será utilizar un conjunto de datos diferente del que utilizamos para construir el árbol, es decir, un conjunto diferente del de entrenamiento. No hay ninguna proporción fijada con respecto al número relativo de componentes de cada subconjunto, pero la más utilizada acostumbra a ser 2/3 para el conjunto de entrenamiento y 1/3, para el conjunto de prueba.
+
+La variable por la que clasificaremos es **amount**, que está en la quinta columna. De esta forma, tendremos un conjunto de datos para el entrenamiento y uno para la validación
+
+```{r}
+conjunto_datos_tree <- conjunto_datos[1:6]
+```
+
+```{r}
+y <- conjunto_datos_tree[,4] 
+X <- conjunto_datos_tree[,-4] 
+```
+
+De forma dinámica podemos definir una forma de separar los datos en función de un parámetro. Así, definimos un parámetro que controla el split de forma dinámica en el test.
+
+```{r}
+split_prop <- 3
+indexes = sample(1:nrow(conjunto_datos_tree), size=floor(((split_prop-1)/split_prop)*nrow(conjunto_datos_tree)))
+
+trainX<-X[indexes,]
+trainy<-y[indexes]
+
+testX<-X[-indexes,]
+testy<-y[-indexes]
+
+```
+
+Después de una extracción aleatoria de casos es altamente recomendable efectuar un análisis de datos mínimo para asegurarnos de no obtener clasificadores sesgados por los valores que contiene cada muestra. En este caso, verificaremos que la proporción del supervivientes es más o menos constante en los dos conjuntos:
+
+```{r}
+
+summary(trainX)
+summary(trainy)
+
+```
+
+```{r}
+
+summary(testX)
+summary(testy)
+
+```
+
+Verificamos fácilmente que no hay diferencias graves que puedan sesgar las conclusiones.
+
+## CREACIÓN DEL MODELO
+
+Se crea el árbol de decisión usando los datos de entrenamiento (no hay que olvidar que la variable outcome es de tipo factor):
+
+```{r}
+trainy <-  as.factor(trainy)
+model <- C50::C5.0(trainX, trainy)
+summary(model)
+```
+
+Errors muestra el número y porcentaje de casos mal clasificados en el subconjunto de entrenamiento.
+
+El árbol obtenido clasifica erróneamente 144 de los 666 casos dados, una tasa de error del 21.6%.
+
+## ÁRBOL OBTENIDO
+
+A continuación, mostramos el árbol obtenido.
+
+```{r}
+plot(model,gp = gpar(fontsize = 6))
+```
+
+# EJERCICIO 3
+
+3.  Con el árbol obtenido, realiza una breve explicación de las reglas obtenidas así como de todos los puntos que te parezcan interesantes. Un elemento a considerar es, por ejemplo, cuantas observaciones caen dentro de cada regla.
+
+### REGLAS
+
+#### CODIFICACIÓN
+
+A partir del árbol de decisión de dos hojas que hemos modelado, se pueden extraer las siguientes reglas de decisión (gracias a rules=TRUE podemos imprimir las reglas directamente):
+
+```{r}
+trainy <-  as.factor(trainy)
+model <- C5.0(trainX, trainy, rules=TRUE )
+summary(model)
+```
+
+#### ANÁLISIS
+
+La extracción de las reglas anteriores nos permite identificar los posibles perfiles de prestatarios en función de la cantidad de dinero que solicitan para el préstamo.
+
+##### CANTIDAD INFERIOR A 1300
+
+**Regla 1**
+
+(8/2, lift 2.7) 
+	months_loan_duration <= 1
+	purpose_category <= 1
+	employment_length <= 4
+	->  class 1  [0.700]
+
+La regla nos describe que, dado un prestatario el cual solicita un préstamo de un mes con el propósito de invertir, el cuál tiene un tiempo de empleo inferior a 5 años, las probabilidades de que solicite un préstamo inferior a 1300 DM son del 70%.
+
+**Regla 2**
+
+(38/17, lift 2.2)
+	months_loan_duration <= 1
+	purpose_category > 1
+	savings_balance <= 1
+	employment_length <= 3
+	->  class 1  [0.550]
+
+La regla nos describe que, dado un prestatario el cual solicita un préstamo de un mes sin la voluntad de invertir, y que, además, tiene un tiempo de empleo inferior a 4 años y pocos ahorros, las probabilidades de que solicite un préstamo inferior a 1300 DM son del 55.0%.
+
+**Regla 3**
+
+(111/52, lift 2.1)
+	months_loan_duration <= 1
+	->  class 1  [0.531]
+
+La regla nos describe que, dado un prestatario el cual solicita un préstamo de un mes, las probabilidades de que éste tenga un valor inferior a 1300 DM son del 53.1%.
+
+##### CANTIDAD SUPERIOR A 1300
+
+**Regla 4**
+
+(555/111, lift 1.1)
+	months_loan_duration > 1
+	->  class 2  [0.799]
+	
+La regla nos describe que, dado un prestatario el cual solicita un préstamo con una duración superior a un mes, las probabilidades de que éste tenga un valor superior a 1300 DM son del 79.9%.
+
+**Regla 5**
+
+(500/120, lift 1.0)
+	employment_length <= 4
+	->  class 2  [0.759]
+
+La regla nos describe que, dado un prestatario que haya sido empleado por menos de 5 años, las probabilidades de el préstamo solicitado tenga un valor superior a 1300 DM son del 75.9%.
+
+# EJERCICIO 4
+
+4.  Una vez tengas un modelo válido, procede a realizar un análisis de la bondad de ajuste sobre el conjunto de test y matriz de confusión. ¿Te parece un modelo suficientemente bueno como para utilizarlo? Justifica tu respuesta considerando todos los posibles tipos de error
+
+## LIBRERIAS
+
+```{r}
+if(!require(gmodels)){
+    install.packages('gmodels', repos='http://cran.us.r-project.org')
+    library(gmodels)
+}
+```
+
+## VALIDACIÓN DEL MODELO
+
+Una vez tenemos el modelo, podemos comprobar su calidad prediciendo la clase para los datos de prueba que nos hemos reservado al principio. 
+
+### PRECISIÓN DEL ÁRBOL
+
+```{r}
+predicted_model <- predict( model, testX, type="class" )
+print(sprintf("La precisión del árbol es: %.4f %%",100*sum(predicted_model == testy) / length(predicted_model)))
+```
+
+### MATRIZ DE CONFUSIÓN
+
+Cuando hay pocas clases, la calidad de la predicción se puede analizar mediante una matriz de confusión que identifica los tipos de errores cometidos. 
+
+```{r}
+mat_conf<-table(testy,Predicted=predicted_model)
+```
+
+La podemos emplear para calcular el porcentaje de registros correctamente clasificados:
+
+```{r}
+
+porcentaje_correct <- 100 * sum(diag(mat_conf)) / sum(mat_conf)
+print(sprintf("El %% de registros correctamente clasificados es: %.4f %%",porcentaje_correct))
+
+```
+
+Además, tenemos a nuestra disposición el paquete gmodels para obtener información más completa:
+
+```{r}
+CrossTable(testy, predicted_model,prop.chisq  = FALSE, prop.c = FALSE, prop.r =FALSE,dnn = c('Reality', 'Prediction'))
+```
+
+## VALORACIÓN DEL MODELO
+
+Debido a que el modelo presenta una precisión de aproximadamente el 75%, se considera bueno.
+
+# EJERCICIO 5
+
+5.  Con un enfoque parecido a los puntos anteriores y considerando las mismas variables, enriquece el ejercicio mediante el ajuste de modelos de árbol de decisión complementarios. ¿Es el nuevo enfoque mejor que el original? Justifica la respuesta
+
+## ENFOQUES ALTERNATIVAS
+
+En este apartado buscaremos probar con las variaciones que nos ofrece el paquete C5.0 para analizar cómo afectan a la creación de los árboles generados. 
+
+### ADAPTATIVE BOOSTING
+
+El algoritmo de "adaptative boosting" genera varios clasificadores con sus correspondientes arboles de decisión y su set de reglas. Cuando un nuevo caso va a ser clasificado, cada clasificador vota cual es la clase predicha. Los votos son sumados y determina la clase final.
+
+#### CODIFICACIÓN
+
+```{r}
+modelo2 = C5.0(trainX, trainy, trials = 10)
+```
+```{r}
+plot(modelo2, gp = gpar(fontsize = 7))
+```
+
+En este caso, dada la simplicidad del conjunto de ejemplo, no se aprecian diferencias, pero aparecerán en datos de mayor complejidad y modificando el parámetro "trials" se puede intentar mejorar los resultados.
+
+#### VALIDACIÓN
+
+##### PRECISIÓN DEL ÁRBOL
+
+Vemos a continuación cómo son las predicciones del nuevo árbol:
+
+```{r}
+predicted_model2 <- predict( modelo2, testX, type="class" )
+print(sprintf("La precisión del árbol es: %.4f %%",100*sum(predicted_model2 == testy) / length(predicted_model2)))
+```
+Según esta técnica de validación, la precisión del modelo a mejorado.
+
+##### MATRIZ DE CONFUSIÓN
+
+Comprobaremos si empleando la matriz de confusión la precisión es mejor o peor:
+
+```{r}
+mat_conf<-table(testy,Predicted=predicted_model2)
+mat_conf
+```
+
+```{r}
+
+porcentaje_correct<-100 * sum(diag(mat_conf)) / sum(mat_conf)
+print(sprintf("El %% de registros correctamente clasificados es: %.4f %%",porcentaje_correct))
+
+```
+
+Según esta técnica de validación, la precisión del modelo a mejorado.
+
+## IMPORTANCIA DE LAS VARIABLES
+
+El algoritmo C5.0 incorpora algunas opciones para ver la importancia de las variables (ver documentación para los detalles entre los dos métodos):
+
+```{r}
+importancia_usage <- C50::C5imp(modelo2, metric = "usage")
+importancia_usage
+
+importancia_splits <- C50::C5imp(modelo2, metric = "splits")
+importancia_splits
+```
+
+# EJERCICIO 6
+
+6.  Haz un resumen de las principales conclusiones de todos los análisis y modelos realizados
+
+## CONCLUSIONES
+
+Una vez realizado el estudio preeliminar, se ha descubierto lo siguientes:
+
+1. El conjunto de datos con el que hemos trabajado no es demasiado preciso, y muchas de sus variables son difíciles de analizar debido a la falta de contexto, vaguedad de las categorías y/o poco relación entre ellas. Es posible que las conclusiones extraidas no sean del todo correctas.
+
+2. Aplicando una gama de algoritmos, tanto supervisados como no supervisados y con una precisión del 75%, hemos podido concluir que los factores que más influyen a la hora de escoger un préstamo elevado son, en ordén de importancia y cada uno teniendo el doble de peso que su sucesor:
+
+- La duración del préstamo, la cual tiende a ser de entre un y dos meses.
+- El dinero que posee el prestatario, determinado por el saldo de cuenta de ahorro y de gasto, el cual es proporcional al tiempo que lleva empleado. A menor dinero, mayor probabilidad.
+- El propósito del préstamo. Se divide entre inversores y no inversores.
+
+3. A partir de estos factores, se han determinado diversos perfiles de personas que tienden a pedir un préstamo relativamente pequeño, partiendo de base que el préstamo dura dos o menos meses: 
+
+- Inversores que poseen poco tiempo de empleo o poco saldo en la cuenta bancaria.
+- No inversores que poseen poco tiempo de empleo y poco saldo de ahorro o que poseen más de cuatro años de empleo.
